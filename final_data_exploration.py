@@ -68,7 +68,7 @@ def plotModel(ax_number, N, title):
 
     return 0
 
-def main():
+def importAndCleanData(threshold):
     # Data obtained through kaggle, see here: 
     # https://www.kaggle.com/new-york-city/nyc-property-sales
     data_path = 'data/nyc-rolling-sales.csv'
@@ -101,11 +101,14 @@ def main():
     # print('size before {}'.format(df.shape))
     drop_index = []
     for i in range(len(sales)):
-        if sales[i] < 1000:
+        if sales[i] < threshold:
             drop_index.append(i)
     df = df.drop(drop_index, axis=0)
     # print('size after  {}'.format(df.shape))
 
+    return df
+
+def plotMeanSalePrice(df):
     # Re-assign trimmed data to relevant columns
     targets = df['SALE PRICE'].values
     targets = pd.to_numeric(targets)
@@ -116,25 +119,7 @@ def main():
     # print(target.shape)
     # print(x.shape)
 
-    # natively has 58681 values which is too big for my RAM
-    # Let's shuffle and get a smaller array
-    data = np.vstack((x,targets)).T
-    np.random.shuffle(data)
-
-    # # Take only first N datapoints
-    # N = 5000
-    # data = data[0:N, :]
-    # print(data.shape)
-
-    # # reshape to work with plotModel function
-    # target = np.array([df['SALE PRICE'].values]).T # Targets from (N,) to (N, 1) to 
-
-    # # Define statistical parameters
-    # noise_sigma = 0.2
-    # beta = (1/noise_sigma)**2
-    # alpha = 2.0
-
-    # find the mean of each borough
+    # find the mean sale price of each borough
     means = np.zeros((5,))
     counts = np.zeros((5,))
 
@@ -154,10 +139,38 @@ def main():
     buroughs = np.arange(5) + 1
     
     plt.scatter(buroughs, means)
+    plt.title('Mean Sale Price per NYC Burough')
+    plt.ylabel('Sale Price ($)')
     plt.xlabel('Burough: 1 = Manhattan, 2 = Bronx, 3 = Brooklyn, 4 = Queens, 5 = Staten Island')
     plt.xticks(buroughs)
-    plt.ylabel('Sale Price ($)')
-    plt.title('Mean Sale Price per NYC Burough')
+
+def main():
+    # Retuns dataFrame with clean sale price data
+    df = importAndCleanData(5000) # argument is price threshold to remove
+    
+    plotMeanSalePrice(df)
+
+    # print(target.shape)
+    # print(x.shape)
+
+    # # natively has 58681 values which is too big for my RAM
+    # # Let's shuffle and get a smaller array
+    # data = np.vstack((x,targets)).T
+    # np.random.shuffle(data)
+
+    # # Take only first N datapoints
+    # N = 5000
+    # data = data[0:N, :]
+    # print(data.shape)
+
+    # # reshape to work with plotModel function
+    # target = np.array([df['SALE PRICE'].values]).T # Targets from (N,) to (N, 1) to 
+
+    # # Define statistical parameters
+    # noise_sigma = 0.2
+    # beta = (1/noise_sigma)**2
+    # alpha = 2.0
+    
     plt.show()
 
 if __name__ == "__main__":
