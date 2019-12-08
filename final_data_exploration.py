@@ -1,23 +1,22 @@
 import math
 import numpy as np
-from scipy.stats import multivariate_normal
 import scipy
 import matplotlib.pyplot as plt   
-from scipy.io import loadmat
-import csv
-import sklearn
-from sklearn import svm, metrics
-from sklearn.model_selection import GridSearchCV
 import random
 import pandas as pd
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
+import folium
+import parse_sales_data
 
 def gaussKernel(input_x, mu):
+    noise_sigma = 0.2
     phi_of_x = (1 / noise_sigma*2*np.pi**(1/2)) * np.exp((-((input_x-mu)**2)/(2*noise_sigma**2)))
     return phi_of_x
 
 # from 4_proj_gaussian_process.py import plotModel
 # Gaussian process linear regression function
-def plotModel(ax_number, N, title):
+def plotRegressionGaussianProcess(ax_number, N, title):
     # Plot original sine curve
     # ax_number.plot(x_sin, y_sin, color='green')
 
@@ -68,46 +67,6 @@ def plotModel(ax_number, N, title):
 
     return 0
 
-def importAndCleanData(threshold):
-    # Data obtained through kaggle, see here: 
-    # https://www.kaggle.com/new-york-city/nyc-property-sales
-    data_path = 'data/nyc-rolling-sales.csv'
-
-    # Import as DataFrame using Pandas
-    df = pd.read_csv(data_path)
-
-    # # Here are a bunch of useful pd methods
-    # print(df.loc[3:4]) # Return numbered row, can be indexed
-    # print(df['SALE PRICE']) # Returns column
-    # print(df['BOROUGH'].values) # Return values of column, can index from here or manipulate
-    # print(df.info()) # Get meta-data about columns
-    # print(df.columns) # Get list of columns
-    # print(df.head()) # Preview of first 5 rows
-    # print(df.tail(2)) # Preview of last indices
-    # print(df.describe().loc['mean'])
-
-    # Remove sale price as np.array
-    sales = df['SALE PRICE'].values
-
-    # Replace strings with '-' values to zeros
-    for i in range(len(sales)):
-        if sales[i].strip() == '-':
-            sales[i] = 0
-
-    # convert ssales data from string to numeric
-    sales = pd.to_numeric(sales)
-
-    # find and remove indices where price is too low or 0
-    # print('size before {}'.format(df.shape))
-    drop_index = []
-    for i in range(len(sales)):
-        if sales[i] < threshold:
-            drop_index.append(i)
-    df = df.drop(drop_index, axis=0)
-    # print('size after  {}'.format(df.shape))
-
-    return df
-
 def plotMeanSalePrice(df):
     # Re-assign trimmed data to relevant columns
     targets = df['SALE PRICE'].values
@@ -144,32 +103,25 @@ def plotMeanSalePrice(df):
     plt.xlabel('Burough: 1 = Manhattan, 2 = Bronx, 3 = Brooklyn, 4 = Queens, 5 = Staten Island')
     plt.xticks(buroughs)
 
+def plotLocationData(df):
+    # Saves to html file to openeed in the browser
+    map1 = folium.Map(
+    location=[40.7128, -74.0060],
+    tiles='cartodbpositron',
+    zoom_start=11,
+    )
+    df.apply(lambda row:folium.CircleMarker(location=[row["latitude"], row["longitude"]]).add_to(map1), axis=1)
+    map1.save('data/nyc_sales.html')
+
+
 def main():
     # Retuns dataFrame with clean sale price data
-    df = importAndCleanData(5000) # argument is price threshold to remove
-    
+    df = parse_sales_data.importAndCleanData(5000) # argument is price threshold to remove
     plotMeanSalePrice(df)
 
-    # print(target.shape)
-    # print(x.shape)
-
-    # # natively has 58681 values which is too big for my RAM
-    # # Let's shuffle and get a smaller array
-    # data = np.vstack((x,targets)).T
-    # np.random.shuffle(data)
-
-    # # Take only first N datapoints
-    # N = 5000
-    # data = data[0:N, :]
-    # print(data.shape)
-
-    # # reshape to work with plotModel function
-    # target = np.array([df['SALE PRICE'].values]).T # Targets from (N,) to (N, 1) to 
-
-    # # Define statistical parameters
-    # noise_sigma = 0.2
-    # beta = (1/noise_sigma)**2
-    # alpha = 2.0
+    # Get new data frame from sales price data
+    df_loc = pd.read_csv('data/nyc_property_loc.csv')
+    plotLocationData(df_loc)
     
     plt.show()
 
