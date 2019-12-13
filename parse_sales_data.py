@@ -99,13 +99,14 @@ def locationFinderToCSV(df):
     locations = np.zeros((len(addresses),))
     latitudes = np.zeros((len(addresses),))
     longitudes = np.zeros((len(addresses),))
+    N = len(addresses)
 
     data = np.vstack((sale_prices, addresses, latitudes, longitudes, neighborhoods, buroughs, zip_codes, gross_sq_feet, land_sq_feet)).T
 
     # Shuffle and take random data draw of size N if desired
-    np.random.shuffle(data)
-    N = 10
-    data = data[0:N, :]
+    # np.random.shuffle(data)
+    # N = 1000
+    # data = data[0:N, :]
 
     # Followed this tutorial: https://towardsdatascience.com/geocode-with-python-161ec1e62b89
     # Conveneint function to delay between geocoding calls
@@ -123,6 +124,8 @@ def locationFinderToCSV(df):
                 break
             except:
                 print('geocoder service not working')
+                location = None
+                break
                 # pop_index.append(i)
                 # rejected_addresses.append(data[i, 1])
         
