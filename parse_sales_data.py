@@ -6,7 +6,7 @@ import pandas as pd
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import folium
-import time
+import time as t
 from datetime import datetime,date,time
 
 def importAndCleanData(threshold):
@@ -64,6 +64,25 @@ def importAndCleanData(threshold):
     df = df.drop(drop_index, axis=0)
     print('DataFrame size after parsing {}'.format(df.shape))
 
+    
+    #apartment number split where apparopriate
+    add = df['ADDRESS'].values
+    apt =  df['APARTMENT NUMBER'].values
+    for i in range(len(df)):
+        temp = add[i].split(",")
+        try:
+            #check if possible to access apartment# in address
+            dummy = temp[1]
+        except:
+            continue
+        add[i] = temp[0]
+        apt[i] = temp[1]
+    df['ADDRESS'] = add
+    df['APARTMENT'] = apt
+
+    today = date.today()
+    today_string = str(today.year) + str(today.month) + str(today.day)
+    df.to_csv('data/CLEAN_nyc_sales_loc_{}_{}.csv'.format(df.shape[0], today_string))
     print('Done!')
     return df
 
@@ -76,8 +95,8 @@ def locationFinderToCSV(df):
     addresses = df['ADDRESS'].values
     buroughs = df['BOROUGH'].values
     neighborhoods = df['NEIGHBORHOOD'].values
-    gross_sq_feet = df['GROSS SQUARE FEET']
-    land_sq_feet = df['LAND SQUARE FEET']
+    gross_sq_feet = df['GROSS SQUARE FEET'].values
+    land_sq_feet = df['LAND SQUARE FEET'].values
 
     # Convert numeric arrays to str types
     zip_codes = zip_codes.astype('str')
@@ -95,12 +114,12 @@ def locationFinderToCSV(df):
         if buroughs[idx] == '5':
             buroughs[idx] = 'STATEN ISLAND'
 
-    addresses = addresses + ', ' + neighborhoods + ', ' + buroughs + ', NEW YORK, NY, ' + zip_codes
+    addresses = addresses + ',' + buroughs + ',NY'# + zip_codes
     locations = np.zeros((len(addresses),))
     latitudes = np.zeros((len(addresses),))
     longitudes = np.zeros((len(addresses),))
     N = len(addresses)
-
+    #N = 50 #temporary 
     data = np.vstack((sale_prices, addresses, latitudes, longitudes, neighborhoods, buroughs, zip_codes, gross_sq_feet, land_sq_feet)).T
 
     # Shuffle and take random data draw of size N if desired
@@ -110,25 +129,39 @@ def locationFinderToCSV(df):
 
     # Followed this tutorial: https://towardsdatascience.com/geocode-with-python-161ec1e62b89
     # Conveneint function to delay between geocoding calls
-    locator = Nominatim(user_agent="myGeocoder")
-
+    locator = Nominatim(user_agent="somegeo")
+    geocode = RateLimiter(locator.geocode, min_delay_seconds=1)
     # Parse out None's and exceptions
     pop_index = []
     rejected_addresses = []
+    timesaved = 0
+    address_index = dict()
     for i in range(N):
-        print('Count is at {} out of {}'.format(i+1, N))
-        
+        if addresses[i] in address_index:
+            existingindex = address_index[addresses[i]]
+            data[i, 2] = data[existingindex, 2]
+            data[i, 3] = data[existingindex, 3]
+            timesaved+=1
+            if (data[i, 2] == None) and (data[i, 3] == None):
+                pop_index.append(i)
+                rejected_addresses.append(data[i, 1])
+            continue
         while True:
+            print('Count is at {0} out of {1}: {2:3.2f} % Done'.format(i+1, N, (i+1)/N*100))
             try:
-                location = locator.geocode(data[i, 1])
+                location = geocode(data[i, 1])
                 break
             except:
                 print('geocoder service not working')
                 location = None
-                break
+                #delay on HTTP request
+                print("Sleeping....")
+                t.sleep(300)
+                print("....Resume")
                 # pop_index.append(i)
                 # rejected_addresses.append(data[i, 1])
-        
+        #add new location to records
+        address_index.update({addresses[i]:i})
         if location is None:
             print('None found')
             data[i, 2] = None # lat
@@ -168,7 +201,7 @@ def locationFinderToCSV(df):
     df_rejected = pd.DataFrame({'addresses':rejected_addresses})
     df_rejected.to_csv('data/nyc_sales_rejected_{}_{}.csv'.format(df_rejected.shape[0], today_string))
 
-    print('Done!')
+    print('Done!: Time saved {}'.format(timesaved))
 
 def main():
     # Retuns original DataFrame with clean sale price data
