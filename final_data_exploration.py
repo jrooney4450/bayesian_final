@@ -209,7 +209,7 @@ def main():
     # plotLocationDataFolium(df_loc)
     
     # Do simple linear regression
-    df_loc2 = pd.read_csv('data/nyc_property_loc_443.csv')
+    df_loc2 = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
     linearRegression(df_loc2)
 
 if __name__ == "__main__":
