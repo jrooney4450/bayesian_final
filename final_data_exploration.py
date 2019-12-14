@@ -124,7 +124,7 @@ def plotLocationDataFolium(df):
 
 def plotLocationDataGeoPandas(df):
     """
-    Not working right now, need
+    Not working right now, need to properly install geopandas
     """
     print(df.head())
     
