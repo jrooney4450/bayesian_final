@@ -24,7 +24,7 @@ def gaussKernel(input_x, mu):
 def twoDKernel(xn, xm, thetas, nus):
     """    
     Try Eq. 6.72 - incorportation of the ARD fromework into the expotential-
-    quadratic framework Eq. 6.63
+    quadratic framework of Eq. 6.63
 
     Use for multi-dimentional inputs
 
@@ -262,7 +262,7 @@ def main():
     # plotMeanSalePrice(df)
 
     # Get new data frame from sales price data
-    df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv')
+    df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv') # does not remove sub-$100,000 sales
     # df_loc_large = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
     # plotLinearRegression(df_loc_small)
     plotRegressionGaussianProcess(df_loc_small)
