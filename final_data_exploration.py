@@ -21,58 +21,125 @@ def gaussKernel(input_x, mu):
     phi_of_x = (1 / noise_sigma*2*np.pi**(1/2)) * np.exp((-((input_x-mu)**2)/(2*noise_sigma**2)))
     return phi_of_x
 
-# from 4_proj_gaussian_process.py import plotModel
-# Gaussian process linear regression function
-def plotRegressionGaussianProcess(ax1, N, title):
-    # Plot original sine curve
-    # ax1.plot(x_sin, y_sin, color='green')
+def twoDKernel(xn, xm, thetas, nus):
+    """    
+    Try Eq. 6.72 - incorportation of the ARD fromework into the expotential-
+    quadratic framework Eq. 6.63
 
-    # Create the target vector with shape based on the data draw and use find the new mean of the weights
-    target_vector = np.array([[x]])
-    print('target vector shape: '.format(target_vector))
+    Use for multi-dimentional inputs
 
-    # Construct the gram matrix per Eq. 6.54
+    Parameters:
+    -----------
+    xn: 1D array with length 2 ([float])
+    xm: 1D array with length 2 ([float])
+    thetas: list with length 4 of learned parameters ([float])
+    nus: list with length 2 of learned parameters ([float])
+
+    Returns:
+    --------
+    k: kernel function result (float)
+    """
+
+    k = thetas[0] *\
+        np.exp((-1/2) * ((nus[0] * (xn[0] - xm[0])**2) + (nus[1] * (xn[1] - xm[1])**2))) +\
+        thetas[2] + thetas[3] *\
+        ((nus[0] * (xn[0] - xm[0])**2) + (nus[1] * (xn[1] - xm[1])**2))
+    return k
+
+def plotRegressionGaussianProcess(df):
+    """
+    Function that plots a linear regression of sales price over 
+    a geographical location using a gaussian process methodology
+
+    Parameters:
+    -----------
+    df: Dataframe with columns labeled 'longitude', 'latitude', 'sale price'
+
+    Returns:
+    --------
+    N/A
+    """
+    noise_sigma = 0.2
+    beta = (1/noise_sigma)**2
+    alpha = 2.0
+
+    x1 = df['longitude'].values # x
+    x2 = df['latitude'].values # y
+    t = df['sale price'].values
+
+    N = x1.shape[0]
+
+    x = np.vstack((x1, x2))
+    print(x.shape)
+    print(x[:,0])
+
+    # Construct the gram matrix per Eq. 6.54    
+    thetas = [1, 1, 1, 1]
+    nus = [1, 1]
+    # k = twoDKernel(x[:, 0], x[:, 0], thetas, nus)
+    # print(k)
+    
     K = np.zeros((N,N))
     for n in range(N):
         for m in range(N):
-            K[n,m] = gaussKernel(x[n], x[m])
+            K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
 
     # Construct the covariance matrix per Eq. 6.62
     delta = np.eye(N)
     C = K + ((1/beta) * delta)
     C_inv = np.linalg.inv(C)
 
+    # plottin variables
+    x_range = max(x1) - min(x1)
+    y_range = max(x2) - min(x2)
+    diff = x_range - y_range
+    d = 0.05
+
     # Find mean for each new x value in the linspace using a gaussian process
-    N_plot = 100
-    x_list = np.linspace(-0.1, 5.1, N_plot)
-    c = np.zeros((1,1))
-    mean_list = []
-    mean_low = []
-    mean_high = []
-    for i in range(len(x_list)):
-        k = np.zeros((N, 1))
-        for j in range(N):
-            k[j, :] = gaussKernel(x[j], x_list[i])
-        m_next = np.matmul(k.T, C_inv)
-        m_next = np.matmul(m_next, target_vector) # Eq. 6.66
-        mean_list.append(m_next[0,0])
+    N_points = 100
 
-        c[0,0] = gaussKernel(x_list[i], x_list[i]) + (1/beta)
-        covar_next = np.matmul(k.T, C_inv) 
-        covar_next = c - np.matmul(covar_next, k) # Eq. 6.67
+    x1_list = np.linspace(min(x1)-diff-d, max(x1)+diff+d, N_points)
+    x2_list = np.linspace(min(x2)-d, max(x2)+d, N_points)
+    X1, X2 = np.meshgrid(x1_list, x2_list)
+
+    # c = np.zeros((1,1))
+    # mean_list = []
+    # mean_low = []
+    # mean_high = []
+    # for i in range(len(x1_list)):
+    #     k = np.zeros((N, 1))
+    #     for j in range(N):
+    #         k[j, :] = twoDKernel(x[: ], x1_list[i], thetas, nus)
+    #     m_next = np.matmul(k.T, C_inv)
+    #     m_next = np.matmul(m_next, t.T) # Eq. 6.66
+    #     mean_list.append(m_next[0,0])
+
+    #     c[0,0] = twoDKernel(x1_list[i], x1_list[i], thetas, nus) + (1/beta)
+    #     covar_next = np.matmul(k.T, C_inv) 
+    #     covar_next = c - np.matmul(covar_next, k) # Eq. 6.67
         
-        # Find predicition accuracy by adding/subtracting covariance to/from mean
-        mean_low.append(m_next[0,0] - np.sqrt(covar_next[0,0]))
-        mean_high.append(m_next[0,0] + np.sqrt(covar_next[0,0]))
+    #     # Find predicition accuracy by adding/subtracting covariance to/from mean
+    #     mean_low.append(m_next[0,0] - np.sqrt(covar_next[0,0]))
+    #     mean_high.append(m_next[0,0] + np.sqrt(covar_next[0,0]))
 
-    # Generate gaussian sinusoid guess based generated means
-    ax1.plot(x_list, mean_list, color = 'r')
-    ax1.fill_between(x_list, mean_low, mean_high, color='mistyrose')
-    ax1.set_xlabel('x')
-    ax1.set_ylabel('t')
-    ax1.set_title(title)
+    # fig, ax1 = plt.subplots()
 
-    return 0
+    # # Generate gaussian sinusoid guess based generated means
+    # ax1.plot(x1_list, mean_list, color = 'r')
+    # ax1.fill_between(x1_list, mean_low, mean_high, color='mistyrose')
+    # ax1.set_xlabel('latitude')
+    # ax1.set_ylabel('longitude')
+    # ax1.set_title('Gaussian Process Sales Price by Location')
+
+    # cs = ax.contourf(X, Y, Z)
+    # ax.scatter(x, y, s=0.8, c='white')
+    # ax.set_title('Sales Price vs. Location Linear Regression')
+    # ax.set_xlabel('longitude')
+    # ax.set_ylabel('latitude')
+
+    # cbar = fig.colorbar(cs)
+    
+    plt.show()
 
 def plotMeanSalePrice(df):
     # Re-assign trimmed data to relevant columns
@@ -135,7 +202,7 @@ def plotLocationDataGeoPandas(df):
 
     plt.show()
 
-def linearRegression(df):
+def plotLinearRegression(df):
     """
     Function that plots a simple linear regression of sales price over geographical location
 
@@ -180,7 +247,7 @@ def linearRegression(df):
     diff = x_range - y_range
     d = 0.05
 
-    N_points = 1000
+    N_points = 100
     x_graphing = np.linspace(min(x)-diff-d, max(x)+diff+d, N_points)
     y_graphing = np.linspace(min(y)-d, max(y)+d, N_points)
     X, Y = np.meshgrid(x_graphing, y_graphing)
@@ -204,13 +271,11 @@ def main():
     # df = parse_sales_data.importAndCleanData(5000) # argument is price threshold to remove
     # plotMeanSalePrice(df)
 
-    # # Get new data frame from sales price data
-    # df_loc = pd.read_csv('data/nyc_property_loc.csv')
-    # plotLocationDataFolium(df_loc)
-    
-    # Do simple linear regression
-    df_loc2 = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
-    linearRegression(df_loc2)
+    # Get new data frame from sales price data
+    df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv')
+    # df_loc_large = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
+    # plotLinearRegression(df_loc_small)
+    plotRegressionGaussianProcess(df_loc_small)
 
 if __name__ == "__main__":
     main()
