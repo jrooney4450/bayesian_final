@@ -9,15 +9,14 @@ import folium
 import time as t
 from datetime import datetime,date,time
 
-def importAndCleanData(threshold):
+def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSF,fIn,beforeGEO,fOutRef):
     print('Starting sales price parser')
     # Data obtained through kaggle, see here: 
     # https://www.kaggle.com/new-york-city/nyc-property-sales
-    data_path = 'data/nyc-rolling-sales.csv'
 
     # Import as DataFrame using Pandas
     print('Reading data')
-    df = pd.read_csv(data_path)
+    df = pd.read_csv(fIn)
 
     # Here are all of the column strings for isolating data
 
@@ -43,46 +42,62 @@ def importAndCleanData(threshold):
     # BUILDING CLASS AT TIME OF SALE    84548 non-null object
     # SALE PRICE                        84548 non-null object
     # SALE DATE                         84548 non-null object
-
     # Remove sale price as np.array
+    
     sales = df['SALE PRICE'].values
+    gsf = df['GROSS SQUARE FEET'].values
+    if beforeGEO:
 
-    # Replace strings with '-' values to zeros
-    for i in range(len(sales)):
-        if sales[i].strip() == '-':
-            sales[i] = 0
+        # Replace strings with '-' values to zeros
+        for i in range(len(sales)):
+            if sales[i].strip() == '-':
+                sales[i] = 0
 
-    # convert ssales data from string to numeric
-    sales = pd.to_numeric(sales)
-
+        # convert ssales data from string to numeric
+        sales = pd.to_numeric(sales)
+    for i in range(len(gsf)):
+        if str(gsf[i]).strip() == '-':
+            gsf[i] = 0      
+    gsf = pd.to_numeric(gsf)
     # find and remove indices where price is too low or 0
-    print('DataFrame size before {}'.format(df.shape))
+    print('DataFrame size before: {}'.format(df.shape))
     drop_index = []
     for i in range(len(sales)):
-        if sales[i] < threshold:
+        if sales[i] < thresholdSale:
             drop_index.append(i)
-    df = df.drop(drop_index, axis=0)
-    print('DataFrame size after parsing {}'.format(df.shape))
-
-    
-    #apartment number split where apparopriate
-    add = df['ADDRESS'].values
-    apt =  df['APARTMENT NUMBER'].values
-    for i in range(len(df)):
-        temp = add[i].split(",")
-        try:
-            #check if possible to access apartment# in address
-            dummy = temp[1]
-        except:
             continue
-        add[i] = temp[0]
-        apt[i] = temp[1]
-    df['ADDRESS'] = add
-    df['APARTMENT'] = apt
+        elif (thresholdGSF != None): 
+            if (gsf[i] <= thresholdGSF):
+                drop_index.append(i)
+                continue 
+            if (sales[i]/gsf[i] < thresholdSPSF):   
+                drop_index.append(i)
+                continue
+    
+    df.drop(drop_index, axis=0,inplace = True)
+    print('DataFrame size after sale and threshold parsing {}'.format(df.shape))
+
+
+    #dont need this for post threshold filter(s)
+    if beforeGEO:
+        #apartment number split where apparopriate
+        add = df['ADDRESS'].values
+        apt =  df['APARTMENT NUMBER'].values
+        for i in range(len(df)):
+            temp = add[i].split(",")
+            try:
+                #check if possible to access apartment# in address
+                dummy = temp[1]
+            except:
+                continue
+            add[i] = temp[0]
+            apt[i] = temp[1]
+        df['ADDRESS'] = add
+        df['APARTMENT'] = apt
 
     today = date.today()
     today_string = str(today.year) + str(today.month) + str(today.day)
-    df.to_csv('data/CLEAN_nyc_sales_loc_{}_{}.csv'.format(df.shape[0], today_string))
+    df.to_csv('data/CLEAN_nyc_sales_loc_{}_{}_{}.csv'.format(fOutRef,df.shape[0], today_string),index = False)
     print('Done!')
     return df
 
