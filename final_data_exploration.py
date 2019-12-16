@@ -10,6 +10,8 @@ from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import folium
 import parse_sales_data
+from sklearn.utils import shuffle
+from scipy.interpolate import griddata
 
 # # Can use these if countour maps are tough in folium
 # import descartes
@@ -59,27 +61,25 @@ def plotRegressionGaussianProcess(df):
     --------
     N/A
     """
+    df = shuffle(df)
+
     noise_sigma = 0.0002
     beta = (1/noise_sigma)**2
+    N = 100
 
-    x1 = df['longitude'].values # x
-    x2 = df['latitude'].values # y
-    t = df['sale price'].values
+    x1 = df['longitude'].values[:N] # x
+    x2 = df['latitude'].values[:N] # y
 
-    N = x1.shape[0]
+    print('imported xy')
+    gsf = df['GROSS SQUARE FEET'].values[:N]
+    sales = df['SALE PRICE'].values[:N]
+    t = np.divide(sales, gsf)
+
+    print('imported t')
+    # N = x1.shape[0]
     x = np.vstack((x1, x2))
-
-    # Parameters for twoDKernel function
-    # TODO: learnParameters function
-    thetas = [.1, .1, .1, .1]
-    nus = [.1, .1]
-    
-    # Construct the gram matrix per Eq. 6.54    
     K = np.zeros((N,N))
-    for n in range(N):
-        for m in range(N):
-            K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
-
+    
     # Construct the covariance matrix per Eq. 6.62
     delta = np.eye(N)
     C = K + ((1/beta) * delta)
@@ -100,6 +100,35 @@ def plotRegressionGaussianProcess(df):
 
     Z = np.zeros((N_points, N_points))
 
+
+    ### parameter tuning ###
+    thetas = [1., 1., 1., 1.]
+    nus = [1., 1.]
+
+    # Construct the gram matrix per Eq. 6.54    
+    for n in range(N):
+        print('gram matrix at iter {} in {}'.format(n+1, N))
+        for m in range(N):
+            K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
+    print('constructed gram matrix')
+
+    mse = 0.0
+    for n in range(N):
+        print('predicitive distro inner loop iteration {} out of 100'.format(n+1))
+        for m in range(N):
+            k = np.zeros((N,))
+            for j in range(N):
+                k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
+            m_next = np.matmul(k.T, C_inv)
+            m_next = np.matmul(m_next, t.T) # Eq. 6.66
+            # print(t[n])
+            # print(m_next)
+            mse += np.square(t[n] - m_next)
+    
+    mse = mse/N
+    print('mse is', mse)
+
+
     # c = np.zeros((1,1))
     for n in range(N_points):
         print('outer loop iteration {} out of 100'.format(n))
@@ -112,17 +141,16 @@ def plotRegressionGaussianProcess(df):
             m_next = np.matmul(m_next, t.T) # Eq. 6.66
             Z[n, m] = m_next
 
-            # Covariance formulations for prediction uncertainty
-            # c[0,0] = twoDKernel(x1_list[i], x1_list[i], thetas, nus) + (1/beta)
-            # covar_next = np.matmul(k.T, C_inv) 
-            # covar_next = c - np.matmul(covar_next, k) # Eq. 6.67
-            
-            # Find predicition accuracy by adding/subtracting covariance to/from mean
-            # mean_low.append(m_next[0,0] - np.sqrt(covar_next[0,0]))
-            # mean_high.append(m_next[0,0] + np.sqrt(covar_next[0,0]))
-
     fig, ax = plt.subplots()
-    cs = ax.contourf(X1, X2, Z)
+    
+    cs = ax.contourf(X1, X2, Z, 100) # plot gaussian process results
+
+    # linearData = griddata(x.T, t, (X1, X2))
+    # cs = ax.countour(X1, X2, linearData, 100) # plot meshgrid of raw data
+
+    # linearData = griddata(x.T, t, (X1, X2), method='cubic')
+    # cs = ax.countour(X1, X2, linearData, 100)
+    
     ax.scatter(x1, x2, s=0.7, c='white')
     ax.set_title('Sales Price vs. Location Linear Regression')
     ax.set_xlabel('longitude')
@@ -247,7 +275,7 @@ def plotLinearRegression(df):
         for idx_y in range(N_points):
             Z[idx_x, idx_y] = m_N[0] + x_graphing[idx_x]*m_N[1] + y_graphing[idx_y]*m_N[2]
 
-    cs = ax.contourf(X, Y, Z)
+    cs = ax.contourf(X, Y, Z, 40)
     ax.scatter(x, y, s=0.8, c='white')
     ax.set_title('Sales Price vs. Location Linear Regression')
     ax.set_xlabel('longitude')
@@ -261,12 +289,16 @@ def main():
     # df = parse_sales_data.importAndCleanData(5000) # argument is price threshold to remove
     # plotMeanSalePrice(df)
 
+    # parse_sales_data.importAndCleanData(100000, 1, 300, 4000, 'data/nyc_sales_loc_53092_20191214.csv', False, 'GSF')
+
     # Get new data frame from sales price data
-    df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv') # does not remove sub-$100,000 sales
+    # df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv') # does not remove sub-$100,000 sales
     # df_loc_large = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
+    df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
     # plotLinearRegression(df_loc_small)
-    plotRegressionGaussianProcess(df_loc_small)
+    # plotRegressionGaussianProcess(df_loc_small)
     # plotRegressionGaussianProcess(df_loc_large)
+    plotRegressionGaussianProcess(df_gsf)
 
 if __name__ == "__main__":
     main()
