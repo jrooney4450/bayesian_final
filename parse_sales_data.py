@@ -9,7 +9,7 @@ import folium
 import time as t
 from datetime import datetime,date,time
 
-def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSF,fIn,beforeGEO,fOutRef):
+def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSFlow, thresholdSPSFhigh, fIn,beforeGEO,fOutRef):
     print('Starting sales price parser')
     # Data obtained through kaggle, see here: 
     # https://www.kaggle.com/new-york-city/nyc-property-sales
@@ -70,9 +70,13 @@ def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSF,fIn,beforeGEO,fO
             if (gsf[i] <= thresholdGSF):
                 drop_index.append(i)
                 continue 
-            if (sales[i]/gsf[i] < thresholdSPSF):   
+            if (sales[i]/gsf[i] < thresholdSPSFlow):   
                 drop_index.append(i)
                 continue
+            if (sales[i]/gsf[i] > thresholdSPSFhigh):   
+                drop_index.append(i)
+                continue
+
     
     df.drop(drop_index, axis=0,inplace = True)
     print('DataFrame size after sale and threshold parsing {}'.format(df.shape))
