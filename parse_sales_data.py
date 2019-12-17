@@ -42,12 +42,13 @@ def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSFlow, thresholdSPS
     # BUILDING CLASS AT TIME OF SALE    84548 non-null object
     # SALE PRICE                        84548 non-null object
     # SALE DATE                         84548 non-null object
-    # Remove sale price as np.array
-    
+
+    # Remove sale price and GSF as np.arrays
     sales = df['SALE PRICE'].values
     gsf = df['GROSS SQUARE FEET'].values
-    if beforeGEO:
 
+    #First Filter pass to clean initial data -> only used once, ignore this portion
+    if beforeGEO:
         # Replace strings with '-' values to zeros
         for i in range(len(sales)):
             if sales[i].strip() == '-':
@@ -55,11 +56,16 @@ def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSFlow, thresholdSPS
 
         # convert ssales data from string to numeric
         sales = pd.to_numeric(sales)
+    
+    
+    #clean GSF so all '-' are 0, so we can compare as ints
     for i in range(len(gsf)):
         if str(gsf[i]).strip() == '-':
             gsf[i] = 0      
     gsf = pd.to_numeric(gsf)
-    # find and remove indices where price is too low or 0
+    
+    # find and remove indices where price is too low, 
+    # or GSF is too low, or price per SF is not in valid ranfe range
     print('DataFrame size before: {}'.format(df.shape))
     drop_index = []
     for i in range(len(sales)):
@@ -77,12 +83,12 @@ def importAndCleanData(thresholdSale,thresholdGSF,thresholdSPSFlow, thresholdSPS
                 drop_index.append(i)
                 continue
 
-    
+    #remove all records that failed one of the above conditions
     df.drop(drop_index, axis=0,inplace = True)
     print('DataFrame size after sale and threshold parsing {}'.format(df.shape))
 
 
-    #dont need this for post threshold filter(s)
+    #dont need this for post threshold filter(s) -> this was for the old data set to get lat/longs
     if beforeGEO:
         #apartment number split where apparopriate
         add = df['ADDRESS'].values
@@ -141,32 +147,34 @@ def locationFinderToCSV(df):
     #N = 50 #temporary 
     data = np.vstack((sale_prices, addresses, latitudes, longitudes, neighborhoods, buroughs, zip_codes, gross_sq_feet, land_sq_feet)).T
 
-    # Shuffle and take random data draw of size N if desired
-    # np.random.shuffle(data)
-    # N = 1000
-    # data = data[0:N, :]
-
     # Followed this tutorial: https://towardsdatascience.com/geocode-with-python-161ec1e62b89
     # Conveneint function to delay between geocoding calls
     locator = Nominatim(user_agent="somegeo")
+    #need rate limiter for webserver not to time you out for too many requests
     geocode = RateLimiter(locator.geocode, min_delay_seconds=1)
     # Parse out None's and exceptions
     pop_index = []
     rejected_addresses = []
     timesaved = 0
     address_index = dict()
+    #basically this a geopy lookup of all lats and longs (takes a while to run)
+    #try except loop so that program doesn't crash during failed web lookup 
+    # which happens all the time b/c packet losses
     for i in range(N):
+        #hash table storing look ups we've already done to save on lookup time
         if addresses[i] in address_index:
             existingindex = address_index[addresses[i]]
             data[i, 2] = data[existingindex, 2]
             data[i, 3] = data[existingindex, 3]
-            timesaved+=1
+            timesaved+=1        #came out to 4+ hours lmao... thank you DSA
             if (data[i, 2] == None) and (data[i, 3] == None):
                 pop_index.append(i)
                 rejected_addresses.append(data[i, 1])
             continue
         while True:
+            #progress bar
             print('Count is at {0} out of {1}: {2:3.2f} % Done'.format(i+1, N, (i+1)/N*100))
+            #LHTTP look up requests
             try:
                 location = geocode(data[i, 1])
                 break
@@ -177,8 +185,6 @@ def locationFinderToCSV(df):
                 print("Sleeping....")
                 t.sleep(300)
                 print("....Resume")
-                # pop_index.append(i)
-                # rejected_addresses.append(data[i, 1])
         #add new location to records
         address_index.update({addresses[i]:i})
         if location is None:
@@ -190,7 +196,6 @@ def locationFinderToCSV(df):
         else:
             data[i, 2] = location.latitude
             data[i, 3] = location.longitude
-        # time.sleep(1)
 
     # Arrange into new DataFrame
     df2 = pd.DataFrame({'sale price':data[:, 0],
@@ -203,7 +208,7 @@ def locationFinderToCSV(df):
                         'gross sq feet':data[:, 7],
                         'land sq feet':data[:, 8]})
 
-    # Find and remove None location values from stored pop_indices
+    # Find and remove None location values from stored pop_indices (failed lookups)
     print('DataFrame size before {}'.format(df2.shape))
     df2 = df2.drop(pop_index, axis=0)
     print('DataFrame size after  {}'.format(df2.shape))    
