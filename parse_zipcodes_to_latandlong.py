@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import folium
 
 def locateNYzipCodes(filename):
-    #This file is a little dirty, literally just control r all semicolons to commas in the csv source file first
+    #This file is a little dirty (ALL NYS zipcodes), literally just control r all semicolons to commas in the csv source file first
     # Also delete last two columns because theyre a repeat of lat and long as a "pair"
     # https://public.opendatasoft.com/explore/embed/dataset/us-zip-code-latitude-and-longitude/table/?refine.state=NY
     df = pd.read_csv(filename)
@@ -19,6 +19,7 @@ def locateNYzipCodes(filename):
     # Daylight savings time flag    2281 non-null int64
     # dtypes: float64(2), int64(3), object(2)
 
+
     #https://www.zillow.com/browse/homes/ny/queens-county/
     queenszips = [11001, 11004, 11005, 11096, 11101, 11102, 11103, 11104, 11105, 11106, 11109, 
                     11120, 11351, 11352, 11354, 11355, 11356, 11357, 11358, 11359, 11360, 11361, 
@@ -30,10 +31,11 @@ def locateNYzipCodes(filename):
     zips = df['Zip'].values      
     cities = df['City'].values
     drop_index = []
+    #Clean NYS zips so they're only NYC zips based on these stored reads
     for i in range(len(zips)):
         if cities[i] in ["New York", "Brooklyn", "Staten Island", "Bronx"]:
             continue
-        if zips[i] in queenszips: #need this bc apparently queens isnt a city (?.?)
+        if zips[i] in queenszips: #need this bc apparently Queens isnt a city (?.?)
             continue
         
         drop_index.append(i)
@@ -43,6 +45,7 @@ def locateNYzipCodes(filename):
 
 def plotZipData(df):
     # Saves to html file to openeed in the browser
+    # For fun, html link in data folder of github gives a nice visual of all zipcodes in NYC
     map1 = folium.Map(
     location=[40.7128, -74.0060],
     tiles='cartodbpositron',
