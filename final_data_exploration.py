@@ -13,58 +13,13 @@ import parse_sales_data
 from sklearn.utils import shuffle
 from scipy.interpolate import griddata
 
-def plotMeanSalePrice(df):
-    """
-    Plots the mean sale price per NYC burough
-
-    Parameters:
-    -----------
-    DataFrame with columns labeled 'SALE PRICE' and 'BUROUGH"
-
-    Returns:
-    --------
-    N/A
-    """
-    # Re-assign trimmed data to relevant columns
-    targets = df['SALE PRICE'].values
-    targets = pd.to_numeric(targets)
-    x = df['BOROUGH'].values
-    N = x.shape[0]
-
-    # Find the mean sale price of each borough
-    means = np.zeros((5,))
-    counts = np.zeros((5,))
-
-    for bur in range(5):
-        m_count = 0
-        c_count = 0
-        for i in range(N):
-            if x[i] == bur + 1:
-                m_count += targets[i]
-                c_count += 1
-        means[bur] = m_count / c_count
-        counts[bur] = c_count
-    
-    for mean in np.nditer(means):
-        mean = format(mean, ',')
-    borough = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
-    x = np.arange(len(borough))
-
-    plt.bar(x, means)
-    plt.title('Mean Sale Price ($) per NYC Burough')
-    plt.ylabel('Sale Price ($)')
-    plt.xlabel('Burough')
-    plt.xticks(x, borough)
-
-    plt.show()
-
 def plotMeanSalePricePerSqFoot(df):
     """
     Plots the mean sale price per square foot per NYC burough
 
     Parameters:
     -----------
-    DataFrame with columns labeled 'SALE PRICE', 'GROSS SQ FEET', and 'burough'
+    DataFrame with columns labeled 'SALE PRICE', 'GROSS SQUARE FEET', and 'burough'
 
     Returns:
     --------
@@ -73,39 +28,39 @@ def plotMeanSalePricePerSqFoot(df):
     # Re-assign trimmed data to relevant columns
     gsf = df['GROSS SQUARE FEET'].values
     sales = df['SALE PRICE'].values
-    t = np.divide(sales, gsf)
+    t = np.divide(sales, gsf) # targets
+    x = df['burough'].values # parameters
 
-    x = df['burough'].values
+    # Initialize needed loop variables
     N = x.shape[0]
-
-    # Find the mean sale price of each borough
     borough = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
     BOROUGH = ['MANHATTAN', 'BRONX', 'BROOKLYN', 'QUEENS', 'STATEN ISLAND']
     means = np.zeros((5,))
     counts = np.zeros((5,))
-
+    
+    # Find the mean sale price of each borough
     for bur in range(5):
         m_count = 0
         c_count = 0
-        print('in loop no', bur)
         for i in range(N):
-            # if x[i] == bur + 1:
             if x[i] == BOROUGH[bur]:
                 m_count += t[i]
                 c_count += 1
         means[bur] = m_count / c_count
         counts[bur] = c_count
     
-    for mean in np.nditer(means):
-        mean = format(mean, ',')
-    borough = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
+    # Plot as a bar graph
     x = np.arange(len(borough))
 
-    plt.bar(x, means)
-    plt.title('Mean Sale Price per Square Foot per NYC Borough')
-    plt.ylabel('Sale Price ($)')
-    plt.xlabel('Borough')
-    plt.xticks(x, borough)
+    fig, ax = plt.subplots()
+    ax.bar(x, means)
+    ax.set_title('Mean Sale Price per Square Foot per NYC Borough')
+    ax.set_ylabel('Sale Price per Square Foot ($)')
+    ax.set_xlabel('Borough')
+    # ax.xticks(x, borough, minor=True)
+    ax.set_xticklabels('')
+    ax.set_xticks([0.4, 1.4, 2.4, 3.4, 4.4], minor=True)
+    ax.set_xticklabels(borough, minor=True)
 
     plt.show()
 
@@ -148,17 +103,15 @@ def plotRegressionGaussianProcessGridSearch(df):
     N/A
     """
     df = shuffle(df)
-    N = 100 # training data
+    N = 100 # training data number
 
     x1 = df['longitude'].values[:N] # x
     x2 = df['latitude'].values[:N] # y
-
     x = np.vstack((x1, x2))
-
-    print('imported xy')
     gsf = df['GROSS SQUARE FEET'].values[:N]
     sales = df['SALE PRICE'].values[:N]
     t = np.divide(sales, gsf)
+    print('Successfully imported data')
 
     # Initialize plotting variables
     x_range = max(x1) - min(x1)
@@ -172,8 +125,6 @@ def plotRegressionGaussianProcessGridSearch(df):
     Z = np.zeros((N_points, N_points))
 
     ### parameter tuning grid search ###
-
-    
     mse_min = np.inf
 
     power = 10
@@ -204,7 +155,6 @@ def plotRegressionGaussianProcessGridSearch(df):
     # for theta_2 in np.nditer(thetas_2):
     # for theta_3 in np.nditer(thetas_3):
 
-    # Grid search ya heard
     for nu_0 in np.nditer(nus_0): 
         for nu_1 in np.nditer(nus_1):
             # print('Starting with beta =', beta)
@@ -235,7 +185,7 @@ def plotRegressionGaussianProcessGridSearch(df):
                 # print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
                 # print('param theta1 = {}. Inner loop iteration {} out of {}'.format(theta_0, n+1, N))
                 # print('param theta2 = {}. Inner loop iteration {} out of {}'.format(theta_2, n+1, N))
-                print('param theta3 = {}. Inner loop iteration {} out of {}'.format(theta_3, n+1, N))
+                print('param nu0 = {}, nu1 = {}. Inner loop iteration {} out of {}'.format(nu_0, nu_1, n+1, N))
                 for m in range(N):
                     k = np.zeros((N,))
                     for j in range(N):
@@ -250,12 +200,16 @@ def plotRegressionGaussianProcessGridSearch(df):
                 # best_beta = beta
                 # best_theta_0 = theta_0
                 # best_theta_2 = theta_2
-                best_theta_3 = theta_3
-                print('best theta3', best_theta_3)
+                # best_theta_3 = theta_3
+                # print('best theta3', best_theta_3)
+                best_nu_0 = nu_0
+                best_nu_1 = nu_1
 
             print('mse is', mse)
-    print('mse_min is', mse_min)
-
+    
+    
+    print('best_nu_0 is', best_nu_0)
+    print('best_nu_1 is', best_nu_1)
 
     # ### Run with hold out data ###
     # N2 = N + 100
@@ -264,14 +218,13 @@ def plotRegressionGaussianProcessGridSearch(df):
     # x2 = x2[N:N2]
     # t = t[N:N2]
 
-    print('best theta3', best_theta_3)
     best_beta = 0.00278
     best_theta_0 = 3.4
     best_theta_2 = 0.278
     best_theta_3 = 1e-5
     
     thetas = [best_theta_0, 0., best_theta_2, best_theta_3]
-    nus = [1., 1.]
+    nus = [best_nu_0, best_nu_1]
 
     # Construct the gram matrix per Eq. 6.54    
     K = np.zeros((N,N))
@@ -351,7 +304,7 @@ def plotRegressionGaussianProcess(df):
     ### parameter tuning grid search ###
     # beta = 0.00278 # from grid search
     # beta = 0.0000278 # scale too high
-    beta = 0.0001
+    beta = 0.00005
 
     # theta_0 from gid search = 3.4
     thetas = [3.4, 1., 0.278, 1.e-5]
@@ -538,12 +491,12 @@ def main():
     # # Run parser to save out new csv file
     # parse_sales_data.importAndCleanData(100000, 1, 300, 4000, 'data/nyc_sales_loc_53092_20191214.csv', False, 'GSF')
 
-    # This stuff has been tested and works!
+    # # This stuff has been tested and works!
     df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
     
-    # plotRegressionGaussianProcessGridSearch(df_gsf)
+    plotRegressionGaussianProcessGridSearch(df_gsf)
 
-    plotRegressionGaussianProcess(df_gsf)
+    # plotRegressionGaussianProcess(df_gsf)
 
     # plotRawContour(df_gsf)
     
