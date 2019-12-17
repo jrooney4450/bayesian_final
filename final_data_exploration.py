@@ -48,16 +48,14 @@ def plotMeanSalePricePerSqFoot(df):
                 c_count += 1
         means[bur] = m_count / c_count
         counts[bur] = c_count
-    
-    # Plot as a bar graph
     x = np.arange(len(borough))
 
+    # Plot as a bar graph
     fig, ax = plt.subplots()
     ax.bar(x, means)
     ax.set_title('Mean Sale Price per Square Foot per NYC Borough')
     ax.set_ylabel('Sale Price per Square Foot ($)')
     ax.set_xlabel('Borough')
-    # ax.xticks(x, borough, minor=True)
     ax.set_xticklabels('')
     ax.set_xticks([0.4, 1.4, 2.4, 3.4, 4.4], minor=True)
     ax.set_xticklabels(borough, minor=True)
@@ -126,23 +124,26 @@ def plotRegressionGaussianProcessGridSearch(df):
 
     ### parameter tuning grid search ###
     mse_min = np.inf
+    mse_min_1 = np.inf
+    mse = 0.0
+    mse_1 = 0.0
 
     power = 10
     betas = np.logspace(-7, 1, num=power)
     # best_beta = 0.0
-    beta = 0.00278
+    beta = 0.00278 # found individually
 
     thetas_0 = np.logspace(-5, 5, num=power)
     # best_theta_0 = 0.0
-    theta_0 = 3.4
+    theta_0 = 3.4 # found individually
 
     thetas_2 = np.logspace(-5, 5, num=power)
     # best_theta_2 = 0.0
-    theta_2 = 0.278
+    theta_2 = 0.278 # found individually
 
     thetas_3 = np.logspace(-5, 5, num=power)
     # best_theta_3 = 0.0
-    theta_3 = 1e-5
+    theta_3 = 1e-5 # found individually
 
     best_nu_0 = 0.
     nus_0 = np.logspace(-5, 5, num=power)
@@ -156,12 +157,13 @@ def plotRegressionGaussianProcessGridSearch(df):
     # for theta_3 in np.nditer(thetas_3):
 
     for nu_0 in np.nditer(nus_0): 
+        mse_0 = 0.0 # count the error for each param guess
         for nu_1 in np.nditer(nus_1):
             # print('Starting with beta =', beta)
             # ('Starting with theta_0 =', theta_0)
             # ('Starting with theta_2 =', theta_2)
             # ('Starting with theta_3 =', theta_3)
-            mse = 0.0 # count the error for each param guess
+            mse_1 = 0.0
             thetas = [theta_0, 0., theta_2, theta_3]
             nus = [nu_0, nu_1]
 
@@ -195,19 +197,19 @@ def plotRegressionGaussianProcessGridSearch(df):
                     mse += np.square(t[n] - m_next)
             mse = np.sqrt(mse/N)
 
-            if mse_min > mse:
-                mse_min = mse
-                # best_beta = beta
-                # best_theta_0 = theta_0
-                # best_theta_2 = theta_2
-                # best_theta_3 = theta_3
-                # print('best theta3', best_theta_3)
-                best_nu_0 = nu_0
+            if mse_min_1 > mse_1:
+                mse_min_1 = mse_1
                 best_nu_1 = nu_1
 
-            print('mse is', mse)
-    
-    
+        if mse_min > mse:
+            mse_min = mse
+            # best_beta = beta
+            # best_theta_0 = theta_0
+            # best_theta_2 = theta_2
+            # best_theta_3 = theta_3
+            # print('best theta3', best_theta_3)
+            best_nu_0 = nu_0
+
     print('best_nu_0 is', best_nu_0)
     print('best_nu_1 is', best_nu_1)
 
@@ -325,7 +327,7 @@ def plotRegressionGaussianProcess(df):
             K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
     print('Constructed gram matrix')
 
-    # Print best results
+    # Print best results from grid search
     for n in range(N_points):
         print('plotter outer loop iteration {} out of 100'.format(n))
         for m in range(N_points):
@@ -365,25 +367,21 @@ def plotRawContour(df):
 
     noise_sigma = 0.0002
     beta = (1/noise_sigma)**2
-    N = 16015
 
+    # Load in the data
     x1 = df['longitude'].values[:N] # x
     x2 = df['latitude'].values[:N] # y
-
     x = np.vstack((x1, x2))
-
-    print('imported xy')
     gsf = df['GROSS SQUARE FEET'].values[:N]
     sales = df['SALE PRICE'].values[:N]
     t = np.divide(sales, gsf)
 
     # Initialize plotting variables
+    N = x1.shape[0]
     x_range = max(x1) - min(x1)
     y_range = max(x2) - min(x2)
     diff = x_range - y_range
     d = 0.001
-
-
     fig, ax = plt.subplots()
     N_points = 100
 
@@ -391,10 +389,10 @@ def plotRawContour(df):
     x2_list = np.linspace(min(x2)-d, max(x2)+d, N_points)
     X1, X2 = np.meshgrid(x1_list, x2_list)
 
+    # Interpolate data to form cohesive heat map and plot as a filled contour
     linearData = griddata(x.T, t, (X1, X2))
     # linearData = griddata(x.T, t, (X1, X2), method='cubic') # Try a cubic interpolation
     cs = ax.contourf(X1, X2, linearData, 100) # plot meshgrid of raw data
-
     ax.scatter(x1, x2, s=0.7, c='white')
     ax.set_title('Sales Price per Square Foot vs. Location Countour Plot')
     ax.set_xlabel('longitude')
@@ -444,16 +442,15 @@ def plotLinearRegression(df):
     m_0 = np.zeros((M,))
     S_0 = alpha**(-1)*np.identity(M)
 
-    # print(df.head())
-
+    # Read in data
     x = df['longitude'].values
     y = df['latitude'].values
     t = df['SALE PRICE'].values
 
     N = x.shape[0]
 
+    # Construct iota matrix with lat and long data
     iota = np.zeros((N, 3))
-
     for i in range(N):
         iota[i, :] = np.array([1, x[i], y[i]])
 
@@ -462,46 +459,45 @@ def plotLinearRegression(df):
 
     # Initialize parameters for plotting
     fig, ax = plt.subplots()
-
     x_range = max(x) - min(x)
     y_range = max(y) - min(y)
     diff = x_range - y_range
     d = 0.05
-
     N_points = 100
+
+    # Center NYC and scale NYC to the plot
     x_graphing = np.linspace(min(x)-diff-d, max(x)+diff+d, N_points)
     y_graphing = np.linspace(min(y)-d, max(y)+d, N_points)
     X, Y = np.meshgrid(x_graphing, y_graphing)
 
+    # Find sales within the 2D meshgrid of latitude and longitude
     Z = np.zeros((N_points, N_points))
     for idx_x in range(N_points):
         for idx_y in range(N_points):
             Z[idx_x, idx_y] = m_N[0] + x_graphing[idx_x]*m_N[1] + y_graphing[idx_y]*m_N[2]
 
+    # Plot as a filled contour
     cs = ax.contourf(X, Y, Z, 40)
     ax.scatter(x, y, s=0.8, c='white')
     ax.set_title('Sales Price vs. Location Linear Regression')
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
-
     cbar = fig.colorbar(cs)
+
     plt.show()
 
 def main():
     # # Run parser to save out new csv file
     # parse_sales_data.importAndCleanData(100000, 1, 300, 4000, 'data/nyc_sales_loc_53092_20191214.csv', False, 'GSF')
 
-    # # This stuff has been tested and works!
+    # Read in the best cleaned dataset
     df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
     
-    plotRegressionGaussianProcessGridSearch(df_gsf)
-
+    # Run some analytics
+    # plotRegressionGaussianProcessGridSearch(df_gsf)
     # plotRegressionGaussianProcess(df_gsf)
-
     # plotRawContour(df_gsf)
-    
-    # plotLinearRegression(df_gsf)
-
+    plotLinearRegression(df_gsf)
     # plotMeanSalePricePerSqFoot(df_gsf)
 
 if __name__ == "__main__":
