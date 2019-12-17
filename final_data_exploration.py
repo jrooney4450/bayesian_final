@@ -59,7 +59,7 @@ def plotRegressionGaussianProcess(df):
     --------
     N/A
     """
-    noise_sigma = 0.0002
+    noise_sigma = 0.00000002
     beta = (1/noise_sigma)**2
 
     x1 = df['longitude'].values # x
@@ -71,8 +71,8 @@ def plotRegressionGaussianProcess(df):
 
     # Parameters for twoDKernel function
     # TODO: learnParameters function
-    thetas = [.1, .1, .1, .1]
-    nus = [.1, .1]
+    thetas = [1., 1., 0., 0.]
+    nus = [1., 1.]
     
     # Construct the gram matrix per Eq. 6.54    
     K = np.zeros((N,N))
@@ -110,7 +110,7 @@ def plotRegressionGaussianProcess(df):
                 k[j] = twoDKernel(x[:, j], np.array([x1_list[n], x2_list[m]]), thetas, nus)
             m_next = np.matmul(k.T, C_inv)
             m_next = np.matmul(m_next, t.T) # Eq. 6.66
-            Z[n, m] = m_next
+            Z[n, m] = m_next # This is the predictive distribution
 
             # Covariance formulations for prediction uncertainty
             # c[0,0] = twoDKernel(x1_list[i], x1_list[i], thetas, nus) + (1/beta)
