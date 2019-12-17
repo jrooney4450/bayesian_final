@@ -132,17 +132,24 @@ def plotRegressionGaussianProcess(df):
     plt.show()
 
 def plotMeanSalePrice(df):
+    """
+    Plots the mean sale price per NYC burough
+
+    Parameters:
+    -----------
+    DataFrame with columns labeled 'SALE PRICE' and 'BUROUGH"
+
+    Returns:
+    --------
+    N/A
+    """
     # Re-assign trimmed data to relevant columns
     targets = df['SALE PRICE'].values
     targets = pd.to_numeric(targets)
-    # Borough number: 1 = Manhattan, 2 = the Bronx, 3 = Brooklyn, 4 = Queens, 5 = Staten Island
     x = df['BOROUGH'].values
     N = x.shape[0]
 
-    # print(target.shape)
-    # print(x.shape)
-
-    # find the mean sale price of each borough
+    # Find the mean sale price of each borough
     means = np.zeros((5,))
     counts = np.zeros((5,))
 
@@ -156,41 +163,41 @@ def plotMeanSalePrice(df):
         means[bur] = m_count / c_count
         counts[bur] = c_count
     
-    # print(means)
-    # print(counts)
+    for mean in np.nditer(means):
+        mean = format(mean, ',')
+    buroughs = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
+    x = np.arange(len(buroughs))
 
-    buroughs = np.arange(5) + 1
-    
-    plt.scatter(buroughs, means)
-    plt.title('Mean Sale Price per NYC Burough')
+    plt.bar(x, means)
+    plt.title('Mean Sale Price ($) per NYC Burough')
     plt.ylabel('Sale Price ($)')
-    plt.xlabel('Burough: 1 = Manhattan, 2 = Bronx, 3 = Brooklyn, 4 = Queens, 5 = Staten Island')
-    plt.xticks(buroughs)
+    plt.xlabel('Burough')
+    plt.xticks(x, buroughs)
 
     plt.show()
 
-def plotLocationDataFolium(df):
-    # Saves to html file - open in browser
-    map1 = folium.Map(
-    location=[40.7128, -74.0060],
-    tiles='cartodbpositron',
-    zoom_start=11,
-    )
-    df.apply(lambda row:folium.CircleMarker(location=[row["latitude"], row["longitude"]]).add_to(map1), axis=1)
-    map1.save('data/nyc_sales.html')
+# def plotLocationDataFolium(df):
+#     # Saves to html file - open in browser
+#     map1 = folium.Map(
+#     location=[40.7128, -74.0060],
+#     tiles='cartodbpositron',
+#     zoom_start=11,
+#     )
+#     df.apply(lambda row:folium.CircleMarker(location=[row["latitude"], row["longitude"]]).add_to(map1), axis=1)
+#     map1.save('data/nyc_sales.html')
 
-def plotLocationDataGeoPandas(df):
-    """
-    Not working right now, need to properly install geopandas
-    """
-    print(df.head())
+# def plotLocationDataGeoPandas(df):
+#     """
+#     Not working right now, need to properly install geopandas
+#     """
+#     print(df.head())
     
-    burough_outline = gpd.read_file('data/geo_export_cf03c40c-e45b-4c62-9373-9ae8fb7cfcda.shp')
+#     burough_outline = gpd.read_file('data/geo_export_cf03c40c-e45b-4c62-9373-9ae8fb7cfcda.shp')
     
-    fig, ax = plt.subplots(figsize = (15, 15))
-    burough_outline.plot(ax = ax)
+#     fig, ax = plt.subplots(figsize = (15, 15))
+#     burough_outline.plot(ax = ax)
 
-    plt.show()
+#     plt.show()
 
 def plotLinearRegression(df):
     """
