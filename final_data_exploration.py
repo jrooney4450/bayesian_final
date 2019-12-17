@@ -13,15 +13,50 @@ import parse_sales_data
 from sklearn.utils import shuffle
 from scipy.interpolate import griddata
 
-# # Can use these if countour maps are tough in folium
-# import descartes
-# import geopandas as gpd
-# from shapely.geometry import Point, Polygon
+def plotMeanSalePrice(df):
+    """
+    Plots the mean sale price per NYC burough
 
-def gaussKernel(input_x, mu):
-    noise_sigma = 0.2
-    phi_of_x = (1 / noise_sigma*2*np.pi**(1/2)) * np.exp((-((input_x-mu)**2)/(2*noise_sigma**2)))
-    return phi_of_x
+    Parameters:
+    -----------
+    DataFrame with columns labeled 'SALE PRICE' and 'BUROUGH"
+
+    Returns:
+    --------
+    N/A
+    """
+    # Re-assign trimmed data to relevant columns
+    targets = df['SALE PRICE'].values
+    targets = pd.to_numeric(targets)
+    x = df['BOROUGH'].values
+    N = x.shape[0]
+
+    # Find the mean sale price of each borough
+    means = np.zeros((5,))
+    counts = np.zeros((5,))
+
+    for bur in range(5):
+        m_count = 0
+        c_count = 0
+        for i in range(N):
+            if x[i] == bur + 1:
+                m_count += targets[i]
+                c_count += 1
+        means[bur] = m_count / c_count
+        counts[bur] = c_count
+    
+    for mean in np.nditer(means):
+        mean = format(mean, ',')
+    buroughs = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
+    x = np.arange(len(buroughs))
+
+    plt.bar(x, means)
+    plt.title('Mean Sale Price ($) per NYC Burough')
+    plt.ylabel('Sale Price ($)')
+    plt.xlabel('Burough')
+    plt.xticks(x, buroughs)
+
+    plt.show()
 
 def twoDKernel(xn, xm, thetas, nus):
     """    
@@ -62,76 +97,102 @@ def plotRegressionGaussianProcess(df):
     N/A
     """
     df = shuffle(df)
-
-    noise_sigma = 0.0002
-    beta = (1/noise_sigma)**2
-    N = 100
+    N = 1000
 
     x1 = df['longitude'].values[:N] # x
     x2 = df['latitude'].values[:N] # y
+
+    x = np.vstack((x1, x2))
 
     print('imported xy')
     gsf = df['GROSS SQUARE FEET'].values[:N]
     sales = df['SALE PRICE'].values[:N]
     t = np.divide(sales, gsf)
 
-    print('imported t')
-    # N = x1.shape[0]
-    x = np.vstack((x1, x2))
-    K = np.zeros((N,N))
-    
-    # Construct the covariance matrix per Eq. 6.62
-    delta = np.eye(N)
-    C = K + ((1/beta) * delta)
-    C_inv = np.linalg.inv(C)
-
     # Initialize plotting variables
     x_range = max(x1) - min(x1)
     y_range = max(x2) - min(x2)
     diff = x_range - y_range
-    d = 0.05
-
-    # Find mean for each new x value in the linspace using a gaussian process
+    d = 0.001
     N_points = 100
-
     x1_list = np.linspace(min(x1)-diff-d, max(x1)+diff+d, N_points)
     x2_list = np.linspace(min(x2)-d, max(x2)+d, N_points)
     X1, X2 = np.meshgrid(x1_list, x2_list)
-
     Z = np.zeros((N_points, N_points))
 
-
-    ### parameter tuning ###
+    ### parameter tuning grid search ###
+    noise_sigma = 0.0002
+    beta = (1/noise_sigma)**2
     thetas = [1., 1., 1., 1.]
     nus = [1., 1.]
+    
+    power = 10
+    betas = np.logspace(1, power, num=power)
+    print('betas', betas)
+    print(betas.shape)
+
+    # theta
+
+    mse_min = np.inf
+    best_beta = 0.0
+    for beta in np.nditer(betas):
+        print('Starting with beta =', beta)
+        mse = 0.0 # count the error for each param guess
+
+        # Construct the gram matrix per Eq. 6.54    
+        K = np.zeros((N,N))
+        
+        # Construct the covariance matrix per Eq. 6.62
+        delta = np.eye(N)
+        C = K + ((1/beta) * delta)
+        C_inv = np.linalg.inv(C)
+
+        # Construct the gram matrix per Eq. 6.54    
+        for n in range(N):
+            # print('gram matrix at iter {} in {}'.format(n+1, N))
+            for m in range(N):
+                K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
+        print('Constructed gram matrix')
+    
+        # Re-use data in predictive distribution
+        for n in range(N):
+            print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
+            for m in range(N):
+                k = np.zeros((N,))
+                for j in range(N):
+                    k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
+                m_next = np.matmul(k.T, C_inv)
+                m_next = np.matmul(m_next, t.T) # Eq. 6.66
+                mse += np.square(t[n] - m_next)
+        mse = np.sqrt(mse/N)
+
+        if mse_min > mse:
+            mse_min = mse
+            best_beta = beta
+
+        print('mse is', mse)
+
+    print('best beta', best_beta)
+    print('mse_min is', mse_min)
+
+    # Construct the gram matrix per Eq. 6.54    
+    K = np.zeros((N,N))
+    
+    # Construct the covariance matrix per Eq. 6.62
+    delta = np.eye(N)
+    C = K + ((1/best_beta) * delta)
+    C_inv = np.linalg.inv(C)
 
     # Construct the gram matrix per Eq. 6.54    
     for n in range(N):
-        print('gram matrix at iter {} in {}'.format(n+1, N))
+        # print('gram matrix at iter {} in {}'.format(n+1, N))
         for m in range(N):
             K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
-    print('constructed gram matrix')
+    print('Constructed gram matrix')
 
-    mse = 0.0
-    for n in range(N):
-        print('predicitive distro inner loop iteration {} out of 100'.format(n+1))
-        for m in range(N):
-            k = np.zeros((N,))
-            for j in range(N):
-                k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
-            m_next = np.matmul(k.T, C_inv)
-            m_next = np.matmul(m_next, t.T) # Eq. 6.66
-            # print(t[n])
-            # print(m_next)
-            mse += np.square(t[n] - m_next)
-    
-    mse = mse/N
-    print('mse is', mse)
-
-
-    # c = np.zeros((1,1))
+    # Print best results
     for n in range(N_points):
-        print('outer loop iteration {} out of 100'.format(n))
+        print('plotter outer loop iteration {} out of 100'.format(n))
         for m in range(N_points):
             # print('inner loop iteration {} out of 100'.format(m))
             k = np.zeros((N,))
@@ -139,86 +200,224 @@ def plotRegressionGaussianProcess(df):
                 k[j] = twoDKernel(x[:, j], np.array([x1_list[n], x2_list[m]]), thetas, nus)
             m_next = np.matmul(k.T, C_inv)
             m_next = np.matmul(m_next, t.T) # Eq. 6.66
-            Z[n, m] = m_next
+            Z[n, m] = m_next # This is the predictive distribution
 
+    # plot gaussian process results
     fig, ax = plt.subplots()
-    
-    cs = ax.contourf(X1, X2, Z, 100) # plot gaussian process results
-
-    # linearData = griddata(x.T, t, (X1, X2))
-    # cs = ax.countour(X1, X2, linearData, 100) # plot meshgrid of raw data
-
-    # linearData = griddata(x.T, t, (X1, X2), method='cubic')
-    # cs = ax.countour(X1, X2, linearData, 100)
-    
+    cs = ax.contourf(X1, X2, Z, 100) 
     ax.scatter(x1, x2, s=0.7, c='white')
-    ax.set_title('Sales Price vs. Location Linear Regression')
+    ax.set_title('Sales Price per Square Foot vs. Location Gaussian Process Regression')
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
     cbar = fig.colorbar(cs)
     
     plt.show()
 
-def plotMeanSalePrice(df):
-    # Re-assign trimmed data to relevant columns
-    targets = df['SALE PRICE'].values
-    targets = pd.to_numeric(targets)
-    # Borough number: 1 = Manhattan, 2 = the Bronx, 3 = Brooklyn, 4 = Queens, 5 = Staten Island
-    x = df['BOROUGH'].values
-    N = x.shape[0]
+def plotRegressionGaussianProcess(df):
+    """
+    Function that plots a linear regression of sales price over 
+    a geographical location using a gaussian process methodology
 
-    # print(target.shape)
-    # print(x.shape)
+    Parameters:
+    -----------
+    df: Dataframe with columns labeled 'longitude', 'latitude', 'sale price'
 
-    # find the mean sale price of each borough
-    means = np.zeros((5,))
-    counts = np.zeros((5,))
+    Returns:
+    --------
+    N/A
+    """
+    df = shuffle(df)
+    N = 1000
 
-    for bur in range(5):
-        m_count = 0
-        c_count = 0
-        for i in range(N):
-            if x[i] == bur + 1:
-                m_count += targets[i]
-                c_count += 1
-        means[bur] = m_count / c_count
-        counts[bur] = c_count
+    x1 = df['longitude'].values[:N] # x
+    x2 = df['latitude'].values[:N] # y
+
+    x = np.vstack((x1, x2))
+
+    print('imported xy')
+    gsf = df['GROSS SQUARE FEET'].values[:N]
+    sales = df['SALE PRICE'].values[:N]
+    t = np.divide(sales, gsf)
+
+    # Initialize plotting variables
+    x_range = max(x1) - min(x1)
+    y_range = max(x2) - min(x2)
+    diff = x_range - y_range
+    d = 0.001
+    N_points = 100
+    x1_list = np.linspace(min(x1)-diff-d, max(x1)+diff+d, N_points)
+    x2_list = np.linspace(min(x2)-d, max(x2)+d, N_points)
+    X1, X2 = np.meshgrid(x1_list, x2_list)
+    Z = np.zeros((N_points, N_points))
+
+    ### parameter tuning grid search ###
+    noise_sigma = 0.0002
+    beta = (1/noise_sigma)**2
+    thetas = [1., 1., 1., 1.]
+    nus = [1., 1.]
     
-    # print(means)
-    # print(counts)
+    # power = 10
+    # betas = np.logspace(1, power, num=power)
+    # print('betas', betas)
+    # print(betas.shape)
 
-    buroughs = np.arange(5) + 1
+    # # theta
+
+    # mse_min = np.inf
+    # best_beta = 0.0
+    # for beta in np.nditer(betas):
+    #     print('Starting with beta =', beta)
+    #     mse = 0.0 # count the error for each param guess
+
+    #     # Construct the gram matrix per Eq. 6.54    
+    #     K = np.zeros((N,N))
+        
+    #     # Construct the covariance matrix per Eq. 6.62
+    #     delta = np.eye(N)
+    #     C = K + ((1/beta) * delta)
+    #     C_inv = np.linalg.inv(C)
+
+    #     # Construct the gram matrix per Eq. 6.54    
+    #     for n in range(N):
+    #         # print('gram matrix at iter {} in {}'.format(n+1, N))
+    #         for m in range(N):
+    #             K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
+    #     print('Constructed gram matrix')
     
-    plt.scatter(buroughs, means)
-    plt.title('Mean Sale Price per NYC Burough')
-    plt.ylabel('Sale Price ($)')
-    plt.xlabel('Burough: 1 = Manhattan, 2 = Bronx, 3 = Brooklyn, 4 = Queens, 5 = Staten Island')
-    plt.xticks(buroughs)
+    #     # Re-use data in predictive distribution
+    #     for n in range(N):
+    #         print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
+    #         for m in range(N):
+    #             k = np.zeros((N,))
+    #             for j in range(N):
+    #                 k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
+    #             m_next = np.matmul(k.T, C_inv)
+    #             m_next = np.matmul(m_next, t.T) # Eq. 6.66
+    #             mse += np.square(t[n] - m_next)
+    #     mse = np.sqrt(mse/N)
 
+    #     if mse_min > mse:
+    #         mse_min = mse
+    #         best_beta = beta
+
+    #     print('mse is', mse)
+
+    # print('best beta', best_beta)
+    # print('mse_min is', mse_min)
+
+    # Construct the gram matrix per Eq. 6.54    
+    K = np.zeros((N,N))
+    
+    # Construct the covariance matrix per Eq. 6.62
+    delta = np.eye(N)
+    C = K + ((1/beta) * delta)
+    C_inv = np.linalg.inv(C)
+
+    # Construct the gram matrix per Eq. 6.54    
+    for n in range(N):
+        # print('gram matrix at iter {} in {}'.format(n+1, N))
+        for m in range(N):
+            K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
+    print('Constructed gram matrix')
+
+    # Print best results
+    for n in range(N_points):
+        print('plotter outer loop iteration {} out of 100'.format(n))
+        for m in range(N_points):
+            # print('inner loop iteration {} out of 100'.format(m))
+            k = np.zeros((N,))
+            for j in range(N):
+                k[j] = twoDKernel(x[:, j], np.array([x1_list[n], x2_list[m]]), thetas, nus)
+            m_next = np.matmul(k.T, C_inv)
+            m_next = np.matmul(m_next, t.T) # Eq. 6.66
+            Z[n, m] = m_next # This is the predictive distribution
+
+    # plot gaussian process results
+    fig, ax = plt.subplots()
+    cs = ax.contourf(X1, X2, Z, 100) 
+    ax.scatter(x1, x2, s=0.7, c='white')
+    ax.set_title('Sales Price per Square Foot vs. Location Gaussian Process Regression')
+    ax.set_xlabel('longitude')
+    ax.set_ylabel('latitude')
+    cbar = fig.colorbar(cs)
+    
+    plt.show()
+
+def plotRawContour(df):
+    """
+    Function that plots a meshgrid of sales price per sq. foot over 
+    a geographical location without using any ML techniques
+
+    Parameters:
+    -----------
+    df: Dataframe with columns labeled 'longitude', 'latitude', 'SALE PRICE'
+
+    Returns:
+    --------
+    N/A
+    """
+    df = shuffle(df)
+
+    noise_sigma = 0.0002
+    beta = (1/noise_sigma)**2
+    N = 16015
+
+    x1 = df['longitude'].values[:N] # x
+    x2 = df['latitude'].values[:N] # y
+
+    x = np.vstack((x1, x2))
+
+    print('imported xy')
+    gsf = df['GROSS SQUARE FEET'].values[:N]
+    sales = df['SALE PRICE'].values[:N]
+    t = np.divide(sales, gsf)
+
+    # Initialize plotting variables
+    x_range = max(x1) - min(x1)
+    y_range = max(x2) - min(x2)
+    diff = x_range - y_range
+    d = 0.001
+
+
+    fig, ax = plt.subplots()
+    N_points = 100
+
+    x1_list = np.linspace(min(x1)-diff-d, max(x1)+diff+d, N_points)
+    x2_list = np.linspace(min(x2)-d, max(x2)+d, N_points)
+    X1, X2 = np.meshgrid(x1_list, x2_list)
+
+    linearData = griddata(x.T, t, (X1, X2))
+    # linearData = griddata(x.T, t, (X1, X2), method='cubic') # Try a cubic interpolation
+    cs = ax.contourf(X1, X2, linearData, 100) # plot meshgrid of raw data
+
+    ax.scatter(x1, x2, s=0.7, c='white')
+    ax.set_title('Sales Price per Square Foot vs. Location Countour Plot')
+    ax.set_xlabel('longitude')
+    ax.set_ylabel('latitude')
+    cbar = fig.colorbar(cs)
+    
     plt.show()
 
 def plotLocationDataFolium(df):
-    # Saves to html file - open in browser
+    """
+    Function that converts location data to an HTML file 
+    which can be openened in the browser to see locations on a detailed map
+
+    Parameters:
+    -----------
+    df: Dataframe with columns labeled 'longitude', 'latitude'
+
+    Returns:
+    --------
+    N/A
+    """
     map1 = folium.Map(
-    location=[40.7128, -74.0060],
+    location=[40.7128, -74.0060], # NYC center lat/long
     tiles='cartodbpositron',
-    zoom_start=11,
+    zoom_start=11, # Scale factor
     )
     df.apply(lambda row:folium.CircleMarker(location=[row["latitude"], row["longitude"]]).add_to(map1), axis=1)
     map1.save('data/nyc_sales.html')
-
-def plotLocationDataGeoPandas(df):
-    """
-    Not working right now, need to properly install geopandas
-    """
-    print(df.head())
-    
-    burough_outline = gpd.read_file('data/geo_export_cf03c40c-e45b-4c62-9373-9ae8fb7cfcda.shp')
-    
-    fig, ax = plt.subplots(figsize = (15, 15))
-    burough_outline.plot(ax = ax)
-
-    plt.show()
 
 def plotLinearRegression(df):
     """
@@ -226,7 +425,7 @@ def plotLinearRegression(df):
 
     Parameters:
     -----------
-    df: Dataframe with columns labeled 'longitude', 'latitude', 'sale price'
+    df: Dataframe with columns labeled 'longitude', 'latitude', 'SALE PRICE'
 
     Returns:
     --------
@@ -244,7 +443,7 @@ def plotLinearRegression(df):
 
     x = df['longitude'].values
     y = df['latitude'].values
-    t = df['sale price'].values
+    t = df['SALE PRICE'].values
 
     N = x.shape[0]
 
@@ -258,7 +457,6 @@ def plotLinearRegression(df):
 
     # Initialize parameters for plotting
     fig, ax = plt.subplots()
-    ax.set_facecolor('k')
 
     x_range = max(x) - min(x)
     y_range = max(y) - min(y)
@@ -285,20 +483,26 @@ def plotLinearRegression(df):
     plt.show()
 
 def main():
-    # # Retuns dataFrame with clean sale price data
-    # df = parse_sales_data.importAndCleanData(5000) # argument is price threshold to remove
-    # plotMeanSalePrice(df)
-
+    # # Run parser to save out new csv file
     # parse_sales_data.importAndCleanData(100000, 1, 300, 4000, 'data/nyc_sales_loc_53092_20191214.csv', False, 'GSF')
 
     # Get new data frame from sales price data
     # df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv') # does not remove sub-$100,000 sales
     # df_loc_large = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
-    df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
     # plotLinearRegression(df_loc_small)
     # plotRegressionGaussianProcess(df_loc_small)
     # plotRegressionGaussianProcess(df_loc_large)
+
+    # This stuff has been tested and works!
+    df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
+    
+    # plotRegressionGaussianProcessGridSearch(df_gsf)
+
     plotRegressionGaussianProcess(df_gsf)
+
+    # plotRawContour(df_gsf)
+    
+    # plotLinearRegression(df_gsf)
 
 if __name__ == "__main__":
     main()
