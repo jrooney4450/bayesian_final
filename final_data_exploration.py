@@ -47,14 +47,65 @@ def plotMeanSalePrice(df):
     
     for mean in np.nditer(means):
         mean = format(mean, ',')
-    buroughs = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
-    x = np.arange(len(buroughs))
+    borough = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
+    x = np.arange(len(borough))
 
     plt.bar(x, means)
     plt.title('Mean Sale Price ($) per NYC Burough')
     plt.ylabel('Sale Price ($)')
     plt.xlabel('Burough')
-    plt.xticks(x, buroughs)
+    plt.xticks(x, borough)
+
+    plt.show()
+
+def plotMeanSalePricePerSqFoot(df):
+    """
+    Plots the mean sale price per square foot per NYC burough
+
+    Parameters:
+    -----------
+    DataFrame with columns labeled 'SALE PRICE', 'GROSS SQ FEET', and 'burough'
+
+    Returns:
+    --------
+    N/A
+    """
+    # Re-assign trimmed data to relevant columns
+    gsf = df['GROSS SQUARE FEET'].values
+    sales = df['SALE PRICE'].values
+    t = np.divide(sales, gsf)
+
+    x = df['burough'].values
+    N = x.shape[0]
+
+    # Find the mean sale price of each borough
+    borough = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
+    BOROUGH = ['MANHATTAN', 'BRONX', 'BROOKLYN', 'QUEENS', 'STATEN ISLAND']
+    means = np.zeros((5,))
+    counts = np.zeros((5,))
+
+    for bur in range(5):
+        m_count = 0
+        c_count = 0
+        print('in loop no', bur)
+        for i in range(N):
+            # if x[i] == bur + 1:
+            if x[i] == BOROUGH[bur]:
+                m_count += t[i]
+                c_count += 1
+        means[bur] = m_count / c_count
+        counts[bur] = c_count
+    
+    for mean in np.nditer(means):
+        mean = format(mean, ',')
+    borough = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island']
+    x = np.arange(len(borough))
+
+    plt.bar(x, means)
+    plt.title('Mean Sale Price per Square Foot per NYC Borough')
+    plt.ylabel('Sale Price ($)')
+    plt.xlabel('Borough')
+    plt.xticks(x, borough)
 
     plt.show()
 
@@ -83,21 +134,21 @@ def twoDKernel(xn, xm, thetas, nus):
         ((nus[0] * (xn[0] - xm[0])**2) + (nus[1] * (xn[1] - xm[1])**2))
     return k
 
-def plotRegressionGaussianProcess(df):
+def plotRegressionGaussianProcessGridSearch(df):
     """
     Function that plots a linear regression of sales price over 
     a geographical location using a gaussian process methodology
 
     Parameters:
     -----------
-    df: Dataframe with columns labeled 'longitude', 'latitude', 'sale price'
+    df: Dataframe with columns labeled 'longitude', 'latitude', 'SALE PRICE', 'GROSS SQUARE FEET'
 
     Returns:
     --------
     N/A
     """
     df = shuffle(df)
-    N = 1000
+    N = 100 # training data
 
     x1 = df['longitude'].values[:N] # x
     x2 = df['latitude'].values[:N] # y
@@ -121,59 +172,106 @@ def plotRegressionGaussianProcess(df):
     Z = np.zeros((N_points, N_points))
 
     ### parameter tuning grid search ###
-    noise_sigma = 0.0002
-    beta = (1/noise_sigma)**2
-    thetas = [1., 1., 1., 1.]
-    nus = [1., 1.]
+
     
-    power = 10
-    betas = np.logspace(1, power, num=power)
-    print('betas', betas)
-    print(betas.shape)
-
-    # theta
-
     mse_min = np.inf
-    best_beta = 0.0
-    for beta in np.nditer(betas):
-        print('Starting with beta =', beta)
-        mse = 0.0 # count the error for each param guess
 
-        # Construct the gram matrix per Eq. 6.54    
-        K = np.zeros((N,N))
+    power = 10
+    betas = np.logspace(-7, 1, num=power)
+    # best_beta = 0.0
+    beta = 0.00278
+
+    thetas_0 = np.logspace(-5, 5, num=power)
+    # best_theta_0 = 0.0
+    theta_0 = 3.4
+
+    thetas_2 = np.logspace(-5, 5, num=power)
+    # best_theta_2 = 0.0
+    theta_2 = 0.278
+
+    thetas_3 = np.logspace(-5, 5, num=power)
+    # best_theta_3 = 0.0
+    theta_3 = 1e-5
+
+    best_nu_0 = 0.
+    nus_0 = np.logspace(-5, 5, num=power)
+
+    best_nu_1 = 0.
+    nus_1 = np.logspace(-5, 5, num=power)
+
+    # for beta in np.nditer(betas):
+    # for theta_0 in np.nditer(thetas_0):
+    # for theta_2 in np.nditer(thetas_2):
+    # for theta_3 in np.nditer(thetas_3):
+
+    # Grid search ya heard
+    for nu_0 in np.nditer(nus_0): 
+        for nu_1 in np.nditer(nus_1):
+            # print('Starting with beta =', beta)
+            # ('Starting with theta_0 =', theta_0)
+            # ('Starting with theta_2 =', theta_2)
+            # ('Starting with theta_3 =', theta_3)
+            mse = 0.0 # count the error for each param guess
+            thetas = [theta_0, 0., theta_2, theta_3]
+            nus = [nu_0, nu_1]
+
+            # Construct the gram matrix per Eq. 6.54    
+            K = np.zeros((N,N))
+            
+            # Construct the covariance matrix per Eq. 6.62
+            delta = np.eye(N)
+            C = K + ((1/beta) * delta)
+            C_inv = np.linalg.inv(C)
+
+            # Construct the gram matrix per Eq. 6.54    
+            for n in range(N):
+                # print('gram matrix at iter {} in {}'.format(n+1, N))
+                for m in range(N):
+                    K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
+            print('Constructed gram matrix')
         
-        # Construct the covariance matrix per Eq. 6.62
-        delta = np.eye(N)
-        C = K + ((1/beta) * delta)
-        C_inv = np.linalg.inv(C)
+            # Re-use data in predictive distribution
+            for n in range(N):
+                # print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
+                # print('param theta1 = {}. Inner loop iteration {} out of {}'.format(theta_0, n+1, N))
+                # print('param theta2 = {}. Inner loop iteration {} out of {}'.format(theta_2, n+1, N))
+                print('param theta3 = {}. Inner loop iteration {} out of {}'.format(theta_3, n+1, N))
+                for m in range(N):
+                    k = np.zeros((N,))
+                    for j in range(N):
+                        k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
+                    m_next = np.matmul(k.T, C_inv)
+                    m_next = np.matmul(m_next, t.T) # Eq. 6.66
+                    mse += np.square(t[n] - m_next)
+            mse = np.sqrt(mse/N)
 
-        # Construct the gram matrix per Eq. 6.54    
-        for n in range(N):
-            # print('gram matrix at iter {} in {}'.format(n+1, N))
-            for m in range(N):
-                K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
-        print('Constructed gram matrix')
-    
-        # Re-use data in predictive distribution
-        for n in range(N):
-            print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
-            for m in range(N):
-                k = np.zeros((N,))
-                for j in range(N):
-                    k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
-                m_next = np.matmul(k.T, C_inv)
-                m_next = np.matmul(m_next, t.T) # Eq. 6.66
-                mse += np.square(t[n] - m_next)
-        mse = np.sqrt(mse/N)
+            if mse_min > mse:
+                mse_min = mse
+                # best_beta = beta
+                # best_theta_0 = theta_0
+                # best_theta_2 = theta_2
+                best_theta_3 = theta_3
+                print('best theta3', best_theta_3)
 
-        if mse_min > mse:
-            mse_min = mse
-            best_beta = beta
-
-        print('mse is', mse)
-
-    print('best beta', best_beta)
+            print('mse is', mse)
     print('mse_min is', mse_min)
+
+
+    # ### Run with hold out data ###
+    # N2 = N + 100
+
+    # x1 = x1[N:N2]
+    # x2 = x2[N:N2]
+    # t = t[N:N2]
+
+    print('best theta3', best_theta_3)
+    best_beta = 0.00278
+    best_theta_0 = 3.4
+    best_theta_2 = 0.278
+    best_theta_3 = 1e-5
+    
+    thetas = [best_theta_0, 0., best_theta_2, best_theta_3]
+    nus = [1., 1.]
 
     # Construct the gram matrix per Eq. 6.54    
     K = np.zeros((N,N))
@@ -227,7 +325,7 @@ def plotRegressionGaussianProcess(df):
     N/A
     """
     df = shuffle(df)
-    N = 1000
+    N = 15000
 
     x1 = df['longitude'].values[:N] # x
     x2 = df['latitude'].values[:N] # y
@@ -251,59 +349,13 @@ def plotRegressionGaussianProcess(df):
     Z = np.zeros((N_points, N_points))
 
     ### parameter tuning grid search ###
-    noise_sigma = 0.002
-    beta = (1/noise_sigma)**2
-    thetas = [10., 1., 1., 1.]
+    # beta = 0.00278 # from grid search
+    # beta = 0.0000278 # scale too high
+    beta = 0.0001
+
+    # theta_0 from gid search = 3.4
+    thetas = [3.4, 1., 0.278, 1.e-5]
     nus = [1., 1.]
-    
-    # power = 10
-    # betas = np.logspace(1, power, num=power)
-    # print('betas', betas)
-    # print(betas.shape)
-
-    # # theta
-
-    # mse_min = np.inf
-    # best_beta = 0.0
-    # for beta in np.nditer(betas):
-    #     print('Starting with beta =', beta)
-    #     mse = 0.0 # count the error for each param guess
-
-    #     # Construct the gram matrix per Eq. 6.54    
-    #     K = np.zeros((N,N))
-        
-    #     # Construct the covariance matrix per Eq. 6.62
-    #     delta = np.eye(N)
-    #     C = K + ((1/beta) * delta)
-    #     C_inv = np.linalg.inv(C)
-
-    #     # Construct the gram matrix per Eq. 6.54    
-    #     for n in range(N):
-    #         # print('gram matrix at iter {} in {}'.format(n+1, N))
-    #         for m in range(N):
-    #             K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
-    #     print('Constructed gram matrix')
-    
-    #     # Re-use data in predictive distribution
-    #     for n in range(N):
-    #         print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
-    #         for m in range(N):
-    #             k = np.zeros((N,))
-    #             for j in range(N):
-    #                 k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
-    #             m_next = np.matmul(k.T, C_inv)
-    #             m_next = np.matmul(m_next, t.T) # Eq. 6.66
-    #             mse += np.square(t[n] - m_next)
-    #     mse = np.sqrt(mse/N)
-
-    #     if mse_min > mse:
-    #         mse_min = mse
-    #         best_beta = beta
-
-    #     print('mse is', mse)
-
-    # print('best beta', best_beta)
-    # print('mse_min is', mse_min)
 
     # Construct the gram matrix per Eq. 6.54    
     K = np.zeros((N,N))
@@ -486,13 +538,6 @@ def main():
     # # Run parser to save out new csv file
     # parse_sales_data.importAndCleanData(100000, 1, 300, 4000, 'data/nyc_sales_loc_53092_20191214.csv', False, 'GSF')
 
-    # Get new data frame from sales price data
-    # df_loc_small = pd.read_csv('data/nyc_property_loc_443.csv') # does not remove sub-$100,000 sales
-    # df_loc_large = pd.read_csv('data/nyc_sales_loc_53092_20191214.csv')
-    # plotLinearRegression(df_loc_small)
-    # plotRegressionGaussianProcess(df_loc_small)
-    # plotRegressionGaussianProcess(df_loc_large)
-
     # This stuff has been tested and works!
     df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
     
@@ -503,6 +548,8 @@ def main():
     # plotRawContour(df_gsf)
     
     # plotLinearRegression(df_gsf)
+
+    # plotMeanSalePricePerSqFoot(df_gsf)
 
 if __name__ == "__main__":
     main()
