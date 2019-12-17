@@ -204,7 +204,7 @@ def plotRegressionGaussianProcess(df):
 
     # plot gaussian process results
     fig, ax = plt.subplots()
-    cs = ax.contourf(X1, X2, Z, 100) 
+    cs = ax.contourf(X1, X2, Z, 40) 
     ax.scatter(x1, x2, s=0.7, c='white')
     ax.set_title('Sales Price per Square Foot vs. Location Gaussian Process Regression')
     ax.set_xlabel('longitude')
@@ -251,9 +251,9 @@ def plotRegressionGaussianProcess(df):
     Z = np.zeros((N_points, N_points))
 
     ### parameter tuning grid search ###
-    noise_sigma = 0.0002
+    noise_sigma = 0.002
     beta = (1/noise_sigma)**2
-    thetas = [1., 1., 1., 1.]
+    thetas = [10., 1., 1., 1.]
     nus = [1., 1.]
     
     # power = 10
