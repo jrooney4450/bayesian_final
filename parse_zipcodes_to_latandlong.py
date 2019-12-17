@@ -37,15 +37,9 @@ def locateNYzipCodes(filename):
             continue
         
         drop_index.append(i)
-    df = df.drop(drop_index, axis = 0)
-    #print(len(df))
-    zipcodes = (df['Zip'].values).astype('str') 
-    latitude = df['Latitude'].values
-    longitude = df['Longitude'].values
-    # print(len(zipcodes))
-    # print(len(np.unique(zipcodes)))   #are unique
-    plotZipData(df)
-    return np.vstack((zipcodes, latitude, longitude)).T
+    df.drop(drop_index, axis = 0,inplace = True)
+
+    return df[['Zip','Latitude','Longitude']]
 
 def plotZipData(df):
     # Saves to html file to openeed in the browser
@@ -55,11 +49,11 @@ def plotZipData(df):
     zoom_start=11,
     )
     df.apply(lambda row:folium.CircleMarker(location=[row["Latitude"], row["Longitude"]]).add_to(map1), axis=1)
-    map1.save('nyczips.html')
+    map1.save('data/nyczips.html')
 
 def main():
-    locateNYzipCodes('us-zip-code-latitude-and-longitude.csv')
-
+    return locateNYzipCodes('data/us-zip-code-latitude-and-longitude.csv')
+    #plotZipData(df)
 
 if __name__ == "__main__":
     main()
