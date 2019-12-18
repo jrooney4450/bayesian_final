@@ -281,7 +281,7 @@ def plotRegressionGaussianProcess(df):
     N/A
     """
     df = shuffle(df)
-    N = 10
+    N = 15000
 
     x1 = df['longitude'].values[:N] # x
     x2 = df['latitude'].values[:N] # y
