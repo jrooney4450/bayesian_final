@@ -370,11 +370,11 @@ def plotRawContour(df):
     beta = (1/noise_sigma)**2
 
     # Load in the data
-    x1 = df['longitude'].values[:N] # x
-    x2 = df['latitude'].values[:N] # y
+    x1 = df['longitude'].values # x
+    x2 = df['latitude'].values # y
     x = np.vstack((x1, x2))
-    gsf = df['GROSS SQUARE FEET'].values[:N]
-    sales = df['SALE PRICE'].values[:N]
+    gsf = df['GROSS SQUARE FEET'].values
+    sales = df['SALE PRICE'].values
     t = np.divide(sales, gsf)
 
     # Initialize plotting variables
