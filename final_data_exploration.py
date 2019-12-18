@@ -145,85 +145,86 @@ def plotRegressionGaussianProcessGridSearch(df):
     # best_theta_3 = 0.0
     theta_3 = 1e-5 # found individually
 
-    best_nu_0 = 0.
     nus_0 = np.logspace(-5, 5, num=power)
+    # best_nu_0 = 0.
+    nu_0 = 1.
 
     best_nu_1 = 0.
-    nus_1 = np.logspace(-5, 5, num=power)
+    # nus_1 = np.logspace(-5, 5, num=power)
+    nu_1 = 1.
 
     # for beta in np.nditer(betas):
     # for theta_0 in np.nditer(thetas_0):
     # for theta_2 in np.nditer(thetas_2):
-    # for theta_3 in np.nditer(thetas_3):
+    for theta_3 in np.nditer(thetas_3):
+    # for nu_0 in np.nditer(nus_0): 
+        mse = 0.0 # count the error for each param guess
+        # for nu_1 in np.nditer(nus_1):
+        # print('Starting with beta =', beta)
+        # ('Starting with theta_0 =', theta_0)
+        # ('Starting with theta_2 =', theta_2)
+        ('Starting with theta_3 =', theta_3)
+        # mse_1 = 0.0
+        thetas = [theta_0, 0., theta_2, theta_3]
+        nus = [nu_0, nu_1]
 
-    for nu_0 in np.nditer(nus_0): 
-        mse_0 = 0.0 # count the error for each param guess
-        for nu_1 in np.nditer(nus_1):
-            # print('Starting with beta =', beta)
-            # ('Starting with theta_0 =', theta_0)
-            # ('Starting with theta_2 =', theta_2)
-            # ('Starting with theta_3 =', theta_3)
-            mse_1 = 0.0
-            thetas = [theta_0, 0., theta_2, theta_3]
-            nus = [nu_0, nu_1]
-
-            # Construct the gram matrix per Eq. 6.54    
-            K = np.zeros((N,N))
-            
-            # Construct the covariance matrix per Eq. 6.62
-            delta = np.eye(N)
-            C = K + ((1/beta) * delta)
-            C_inv = np.linalg.inv(C)
-
-            # Construct the gram matrix per Eq. 6.54    
-            for n in range(N):
-                # print('gram matrix at iter {} in {}'.format(n+1, N))
-                for m in range(N):
-                    K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
-            print('Constructed gram matrix')
+        # Construct the gram matrix per Eq. 6.54    
+        K = np.zeros((N,N))
         
-            # Re-use data in predictive distribution
-            for n in range(N):
-                # print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
-                # print('param theta1 = {}. Inner loop iteration {} out of {}'.format(theta_0, n+1, N))
-                # print('param theta2 = {}. Inner loop iteration {} out of {}'.format(theta_2, n+1, N))
-                print('param nu0 = {}, nu1 = {}. Inner loop iteration {} out of {}'.format(nu_0, nu_1, n+1, N))
-                for m in range(N):
-                    k = np.zeros((N,))
-                    for j in range(N):
-                        k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
-                    m_next = np.matmul(k.T, C_inv)
-                    m_next = np.matmul(m_next, t.T) # Eq. 6.66
-                    mse += np.square(t[n] - m_next)
-            mse = np.sqrt(mse/N)
+        # Construct the covariance matrix per Eq. 6.62
+        delta = np.eye(N)
+        C = K + ((1/beta) * delta)
+        C_inv = np.linalg.inv(C)
 
-            if mse_min_1 > mse_1:
-                mse_min_1 = mse_1
-                best_nu_1 = nu_1
+        # Construct the gram matrix per Eq. 6.54    
+        for n in range(N):
+            # print('gram matrix at iter {} in {}'.format(n+1, N))
+            for m in range(N):
+                K[n,m] = twoDKernel(x[:, n], x[:, m], thetas, nus)
+        print('Constructed gram matrix')
+    
+        # Re-use data in predictive distribution
+        for n in range(N):
+            # print('param beta = {}. Inner loop iteration {} out of {}'.format(beta, n+1, N))
+            # print('param theta1 = {}. Inner loop iteration {} out of {}'.format(theta_0, n+1, N))
+            # print('param theta2 = {}. Inner loop iteration {} out of {}'.format(theta_2, n+1, N))
+            print('param nu0 = {}, nu1 = {}. Inner loop iteration {} out of {}'.format(nu_0, nu_1, n+1, N))
+            for m in range(N):
+                k = np.zeros((N,))
+                for j in range(N):
+                    k[j] = twoDKernel(x[:, j], np.array([x1[n], x2[m]]), thetas, nus)
+                m_next = np.matmul(k.T, C_inv)
+                m_next = np.matmul(m_next, t.T) # Eq. 6.66
+                mse += np.square(t[n] - m_next)
 
+        # mse_1 = np.sqrt(mse_1/N)
+        # if mse_min_1 > mse_1:
+        #     mse_min_1 = mse_1
+        #     best_nu_1 = nu_1
+
+        mse = np.sqrt(mse/N)
         if mse_min > mse:
             mse_min = mse
             # best_beta = beta
             # best_theta_0 = theta_0
             # best_theta_2 = theta_2
-            # best_theta_3 = theta_3
+            best_theta_3 = theta_3
             # print('best theta3', best_theta_3)
-            best_nu_0 = nu_0
+            # best_nu_0 = nu_0
 
-    print('best_nu_0 is', best_nu_0)
-    print('best_nu_1 is', best_nu_1)
-
-    # ### Run with hold out data ###
-    # N2 = N + 100
-
-    # x1 = x1[N:N2]
-    # x2 = x2[N:N2]
-    # t = t[N:N2]
+    # print('best beta', best_beta)
+    # print('best theta0', best_theta_0)
+    # print('best theta2', best_theta_2)
+    print('best theta3', best_theta_3)
+    # print('best_nu_0 is', best_nu_0)
+    # print('best_nu_1 is', best_nu_1)
 
     best_beta = 0.00278
     best_theta_0 = 3.4
     best_theta_2 = 0.278
     best_theta_3 = 1e-5
+    best_nu_1 = 1.
+    best_nu_0 = 1.
     
     thetas = [best_theta_0, 0., best_theta_2, best_theta_3]
     nus = [best_nu_0, best_nu_1]
@@ -487,17 +488,14 @@ def plotLinearRegression(df):
     plt.show()
 
 def main():
-    # # Run parser to save out new csv file
-    # parse_sales_data.importAndCleanData(100000, 1, 300, 4000, 'data/nyc_sales_loc_53092_20191214.csv', False, 'GSF')
-
     # Read in the best cleaned dataset
     df_gsf = pd.read_csv('data/CLEAN_nyc_sales_loc_GSF_16015_20191216.csv')
     
-    # Run some analytics
+    # Run Some Analytics - Choose a function below
     # plotRegressionGaussianProcessGridSearch(df_gsf)
-    # plotRegressionGaussianProcess(df_gsf)
+    plotRegressionGaussianProcess(df_gsf)
     # plotRawContour(df_gsf)
-    plotLinearRegression(df_gsf)
+    # plotLinearRegression(df_gsf)
     # plotMeanSalePricePerSqFoot(df_gsf)
 
 if __name__ == "__main__":
